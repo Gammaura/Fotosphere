@@ -1,78 +1,124 @@
-"""pages/3_shoot.py — Sesi foto"""
+"""pages/3_shoot.py — Sesi foto landscape 3-panel"""
 
 import streamlit as st
 import time
 from PIL import Image
-from utils import mirror_image, pil_to_bytes, FRAMES
+from utils import mirror_image, pil_to_bytes, FRAMES, build_strip, apply_filter
 from db import upload_photo, update_session
-from style import GLOBAL_CSS, step_indicator
+from style import GLOBAL_CSS, step_bar
 
-st.set_page_config(page_title="PhotoBooth · Foto", page_icon="📸", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Gamma PhotoBooth · Foto", page_icon="📸",
+                   layout="wide", initial_sidebar_state="collapsed")
 st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 st.markdown("""
 <style>
-.timer-box {
-    background: linear-gradient(135deg, #fff0f6, #f3eaff);
-    border: 2px solid #f8bbd0;
-    border-radius: 16px;
-    padding: 0.8rem 1.5rem;
-    text-align: center;
-    margin-bottom: 1rem;
-}
-.timer-num {
-    font-size: 2.8rem;
+.block-container { padding: 1rem 1.5rem !important; max-width: 100% !important; }
+
+/* Timer besar */
+.big-timer {
+    font-size: 5rem;
     font-weight: 900;
-    color: #e91e8c;
+    color: #ff4d8d !important;
     line-height: 1;
-    margin: 0;
-}
-.timer-num.warn { color: #fb8c00 !important; }
-.timer-num.danger { color: #e53935 !important; animation: blink 0.6s infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.4} }
-.timer-label { font-size: 0.7rem; color: #a68ab0; margin-top: 4px; font-weight: 700; letter-spacing: 2px; }
-
-.progress-wrap { margin-bottom: 1rem; }
-.progress-label {
-    display: flex; justify-content: space-between;
-    font-size: 0.75rem; font-weight: 700; margin-bottom: 6px;
-}
-.progress-bar { background: #ebd5f0; border-radius: 10px; height: 8px; overflow: hidden; }
-.progress-fill { height: 100%; border-radius: 10px; background: linear-gradient(90deg, #f06292, #9c7bb5); transition: width 0.4s ease; }
-
-.slot-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 1rem 0; }
-.slot-empty {
-    background: white;
-    border: 2px dashed #ebd5f0;
-    border-radius: 12px;
-    height: 80px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.65rem; color: #c9a8d4; font-weight: 700;
-}
-.slot-empty.active {
-    border-color: #f06292 !important;
-    background: #fff0f6 !important;
-    color: #f06292 !important;
-    animation: pulse 1.5s ease-in-out infinite;
-}
-@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(240,98,146,0.3)} 50%{box-shadow:0 0 0 6px rgba(240,98,146,0)} }
-
-.cam-wrapper {
-    background: white;
-    border: 2px solid #ebd5f0;
-    border-radius: 20px;
-    padding: 1rem;
-    margin-bottom: 1rem;
-}
-.cam-label {
-    font-size: 0.8rem; font-weight: 800;
-    color: #7b5ea7; margin-bottom: 0.6rem;
     text-align: center;
+    text-shadow: 0 4px 20px rgba(255,77,141,0.3);
+}
+.big-timer.warn { color: #fb8c00 !important; text-shadow: 0 4px 20px rgba(251,140,0,0.3); }
+.big-timer.danger { color: #e53935 !important; animation: bigpulse 0.5s infinite; }
+@keyframes bigpulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+
+/* Countdown overlay */
+.countdown-num {
+    font-size: 8rem;
+    font-weight: 900;
+    color: #ff4d8d !important;
+    text-align: center;
+    line-height: 1;
+    animation: countpop 0.5s ease-out;
+    text-shadow: 0 0 40px rgba(255,77,141,0.5);
+}
+@keyframes countpop {
+    0% { transform: scale(1.5); opacity: 0.5; }
+    100% { transform: scale(1); opacity: 1; }
 }
 
-/* Mirror flip CSS */
-.mirror-cam div[data-testid="stCameraInput"] video,
-.mirror-cam div[data-testid="stCameraInput"] img {
-    transform: scaleX(-1) !important;
+/* Slot indicator */
+.slot-row { display:flex; gap:8px; justify-content:center; margin:0.5rem 0; }
+.slot-dot {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; font-weight: 800;
+    border: 2px solid #e8e8f0;
+    color: #9a9aaa !important;
+    background: white;
+}
+.slot-dot.done { background: #ff4d8d; color: white !important; border-color: #ff4d8d; }
+.slot-dot.active { background: white; border-color: #ff4d8d; color: #ff4d8d !important;
+    box-shadow: 0 0 0 3px #ffb3ce; animation: pulsedot 1.2s ease-in-out infinite; }
+@keyframes pulsedot { 0%,100%{box-shadow:0 0 0 3px #ffb3ce} 50%{box-shadow:0 0 0 6px #ffe0eb} }
+
+/* Camera panel */
+.cam-panel {
+    background: white;
+    border-radius: 24px;
+    padding: 1rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    border: 1.5px solid #f0f0f0;
+    position: relative;
+}
+.cam-header {
+    font-size: 0.8rem;
+    font-weight: 800;
+    color: #9a9aaa;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+/* Preview panel */
+.preview-panel {
+    background: white;
+    border-radius: 24px;
+    padding: 1rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+    border: 1.5px solid #f0f0f0;
+}
+.preview-header {
+    font-size: 0.75rem;
+    font-weight: 800;
+    color: #9a9aaa;
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+}
+
+/* Mirror flip */
+div[data-testid="stCameraInput"] video,
+div[data-testid="stCameraInput"] img { transition: transform 0.2s; }
+.mirror-active div[data-testid="stCameraInput"] video,
+.mirror-active div[data-testid="stCameraInput"] img { transform: scaleX(-1) !important; }
+
+/* Action buttons */
+.btn-retake > button {
+    background: white !important;
+    color: #ff4d8d !important;
+    border: 2px solid #ffb3ce !important;
+    font-size: 0.85rem !important;
+    font-weight: 800 !important;
+    box-shadow: none !important;
+    padding: 0.6rem !important;
+}
+.btn-retake > button:hover { background: #fff0f5 !important; transform: none !important; box-shadow: none !important; }
+
+.btn-next > button {
+    background: linear-gradient(135deg, #ff4d8d, #e0005a) !important;
+    font-size: 0.9rem !important;
+    font-weight: 900 !important;
+    padding: 0.7rem !important;
+    box-shadow: 0 4px 15px rgba(255,77,141,0.4) !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -84,164 +130,88 @@ if not st.session_state.get("session_id"):
         st.switch_page("app.py")
     st.stop()
 
-SESSION_DURATION = 5 * 60
+frame_choice = st.session_state.get("frame_choice", list(FRAMES.keys())[0])
+frame = FRAMES[frame_choice]
+N = frame["n_photos"]
+mirror = st.session_state.get("mirror", False)
 
-if "start_time" not in st.session_state or st.session_state.start_time is None:
-    st.session_state.start_time = time.time()
-if "photos" not in st.session_state or not isinstance(st.session_state.photos, list) or len(st.session_state.photos) != 4:
-    st.session_state.photos = [None, None, None, None]
-if "active_slot" not in st.session_state:
+# Init state
+if "photos" not in st.session_state or not isinstance(st.session_state.photos, list) or len(st.session_state.photos) != N:
+    st.session_state.photos = [None] * N
+if "active_slot" not in st.session_state or st.session_state.active_slot is None:
     st.session_state.active_slot = 0
+if "countdown_active" not in st.session_state or st.session_state.countdown_active is None:
+    st.session_state.countdown_active = False
+if "countdown_start" not in st.session_state:
+    st.session_state.countdown_start = None
+if "phase" not in st.session_state:
+    st.session_state.phase = "shooting"  # shooting | review
 
 photos = st.session_state.photos
-mirror = st.session_state.get("mirror", False)
-frame_choice = st.session_state.get("frame_choice", list(FRAMES.keys())[0])
-filled = sum(1 for p in photos if p is not None)
 active = st.session_state.active_slot
-
-elapsed = time.time() - st.session_state.start_time
-remaining = max(0, SESSION_DURATION - elapsed)
-mins, secs = int(remaining // 60), int(remaining % 60)
-timer_class = "danger" if remaining <= 30 else ("warn" if remaining <= 60 else "")
-
-# ── Timeout ────────────────────────────────────────────────────────────────────
-if remaining <= 0:
-    st.markdown("""
-    <div style="text-align:center; padding:2rem;">
-        <div style="font-size:3rem;">⏱️</div>
-        <h2 style="color:#e91e8c; font-size:1.5rem;">Waktu Habis!</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    valid = [p for p in photos if p is not None]
-    if valid:
-        st.info(f"Kamu punya {len(valid)} foto. Mau lanjut ke filter?")
-        if st.button("Lanjut ke Filter →"):
-            st.session_state.final_photos = valid
-            st.switch_page("pages/4_filter.py")
-    else:
-        if st.button("← Mulai Ulang"):
-            for k in ["session_id","start_time","photos","active_slot"]:
-                st.session_state.pop(k, None)
-            st.switch_page("app.py")
-    st.stop()
+filled = sum(1 for p in photos if p is not None)
+phase = st.session_state.phase
 
 # ── Header ─────────────────────────────────────────────────────────────────────
-st.markdown(step_indicator(3), unsafe_allow_html=True)
+st.markdown(step_bar(3), unsafe_allow_html=True)
 
-# Timer
-st.markdown(f"""
-<div class="timer-box">
-    <p class="timer-num {timer_class}">{mins:02d}:{secs:02d}</p>
-    <p class="timer-label">SISA WAKTU</p>
-</div>
-""", unsafe_allow_html=True)
+h_back, h_title, h_info = st.columns([1, 4, 1])
+with h_back:
+    st.markdown('<div class="btn-ghost">', unsafe_allow_html=True)
+    if st.button("← BACK"):
+        st.switch_page("pages/2_frame.py")
+    st.markdown('</div>', unsafe_allow_html=True)
+with h_title:
+    st.markdown(f'<h2 style="text-align:center; font-size:1.3rem; font-weight:900; letter-spacing:3px; margin:0; color:#2a2a3a;">{frame_choice} · {"🪞 Mirror" if mirror else "📷 Normal"}</h2>', unsafe_allow_html=True)
+with h_info:
+    st.markdown(f'<p style="text-align:right; font-size:0.8rem; font-weight:800; color:#ff4d8d; margin:0;">{filled}/{N} Foto</p>', unsafe_allow_html=True)
 
-# Progress
-st.markdown(f"""
-<div class="progress-wrap">
-    <div class="progress-label">
-        <span style="color:#7b5ea7;">Progress Foto</span>
-        <span style="color:#f06292;">{filled} / 4</span>
-    </div>
-    <div class="progress-bar">
-        <div class="progress-fill" style="width:{filled*25}%"></div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Slot thumbnails ─────────────────────────────────────────────────────────────
-slot_html = '<div class="slot-grid">'
-for i in range(4):
+# Slot indicator
+dots_html = '<div class="slot-row">'
+for i in range(N):
     if photos[i] is not None:
-        slot_html += f'<div style="border-radius:12px; overflow:hidden; border:2px solid #f8bbd0; height:80px;">foto{i}</div>'
+        cls = "done"
+        lbl = "✓"
+    elif i == active and phase == "shooting":
+        cls = "active"
+        lbl = str(i+1)
     else:
-        is_active = i == active
-        label = "← Sini!" if is_active else f"Slot {i+1}"
-        slot_html += f'<div class="slot-empty {"active" if is_active else ""}">{label}</div>'
-slot_html += '</div>'
-st.markdown(slot_html, unsafe_allow_html=True)
+        cls = ""
+        lbl = str(i+1)
+    dots_html += f'<div class="slot-dot {cls}">{lbl}</div>'
+dots_html += '</div>'
+st.markdown(dots_html, unsafe_allow_html=True)
 
-# Render actual photos in slots using columns
-has_photos = any(p is not None for p in photos)
-if has_photos:
-    thumb_cols = st.columns(4, gap="small")
-    for i in range(4):
-        with thumb_cols[i]:
+st.markdown("<hr class='divider' style='margin:0.5rem 0;'>", unsafe_allow_html=True)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE: REVIEW (semua foto sudah diambil)
+# ═══════════════════════════════════════════════════════════════════════════════
+if phase == "review":
+    st.markdown('<h3 style="text-align:center; font-size:1.1rem; font-weight:900; color:#2a2a3a; margin:0.5rem 0;">Review Foto Kamu</h3>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center; font-size:0.8rem; color:#9a9aaa; margin-bottom:1rem;">Mau retake foto mana? Atau langsung next ke filter.</p>', unsafe_allow_html=True)
+
+    # Tampilkan semua foto
+    photo_cols = st.columns(N, gap="small")
+    for i in range(N):
+        with photo_cols[i]:
             if photos[i] is not None:
-                st.image(photos[i], use_container_width=True)
-                st.markdown('<div class="btn-ghost">', unsafe_allow_html=True)
-                if st.button(f"🔄 Retake", key=f"rt_{i}", use_container_width=True):
+                st.image(photos[i], use_container_width=True, caption=f"Foto {i+1}")
+                st.markdown('<div class="btn-retake">', unsafe_allow_html=True)
+                if st.button(f"🔄 Retake {i+1}", key=f"rev_rt_{i}", use_container_width=True):
                     photos[i] = None
                     st.session_state.photos = photos
                     st.session_state.active_slot = i
+                    st.session_state.phase = "shooting"
+                    st.session_state.countdown_active = False
                     st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("<hr class='divider'>", unsafe_allow_html=True)
-
-# ── Camera ─────────────────────────────────────────────────────────────────────
-st.markdown(f"""
-<div class="cam-wrapper {'mirror-cam' if mirror else ''}">
-    <div class="cam-label">📸 Slot {active+1} dari 4 {'· 🪞 Mirror' if mirror else ''}</div>
-""", unsafe_allow_html=True)
-
-if mirror:
-    st.markdown("""
-    <style>
-    div[data-testid="stCameraInput"] video,
-    div[data-testid="stCameraInput"] img { transform: scaleX(-1) !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
-camera_img = st.camera_input(
-    f"Ambil foto slot {active+1}",
-    key=f"cam_{active}_{int(st.session_state.start_time)}",
-    label_visibility="collapsed",
-)
-st.markdown('</div>', unsafe_allow_html=True)
-
-if camera_img is not None:
-    raw = Image.open(camera_img).convert("RGB")
-    if mirror:
-        raw = mirror_image(raw)
-
-    _, prev_col, _ = st.columns([1, 3, 1])
-    with prev_col:
-        st.image(raw, use_container_width=True, caption=f"Preview Slot {active+1}")
-
-    _, btn_col, _ = st.columns([1, 3, 1])
-    with btn_col:
-        if st.button(f"✅  Simpan Foto {active+1}", use_container_width=True):
-            photos[active] = raw
-            st.session_state.photos = photos
-            next_empty = next((j for j in range(4) if photos[j] is None), None)
-            if next_empty is not None:
-                st.session_state.active_slot = next_empty
-            st.rerun()
-
-st.markdown("<hr class='divider'>", unsafe_allow_html=True)
-
-# ── Next ───────────────────────────────────────────────────────────────────────
-_, next_col, _ = st.columns([1, 4, 1])
-with next_col:
-    if filled == 4:
-        st.success("🎉 Semua foto terambil! Siap lanjut ke filter.")
-        if st.button("✨  Lanjut ke Filter!", use_container_width=True):
-            with st.spinner("Menyimpan foto..."):
-                urls = []
-                for idx, photo in enumerate(photos):
-                    if photo is not None:
-                        try:
-                            url = upload_photo(st.session_state.session_id, idx, pil_to_bytes(photo))
-                            urls.append(url)
-                        except:
-                            urls.append("")
-                update_session(st.session_state.session_id, photo_urls=urls)
-                st.session_state.final_photos = [p for p in photos if p is not None]
-                st.switch_page("pages/4_filter.py")
-    elif filled > 0:
-        st.markdown('<div class="btn-sec">', unsafe_allow_html=True)
-        if st.button(f"Lanjut dengan {filled} foto →", use_container_width=True):
+    st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+    _, next_col, _ = st.columns([1, 2, 1])
+    with next_col:
+        st.markdown('<div class="btn-next">', unsafe_allow_html=True)
+        if st.button("✨  NEXT — Pilih Filter", use_container_width=True):
             with st.spinner("Menyimpan foto..."):
                 urls = []
                 for idx, photo in enumerate(photos):
@@ -255,8 +225,111 @@ with next_col:
                 st.session_state.final_photos = [p for p in photos if p is not None]
                 st.switch_page("pages/4_filter.py")
         st.markdown('</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<p style="text-align:center; color:#a68ab0; font-size:0.8rem;">Ambil minimal 1 foto untuk lanjut ⬆️</p>', unsafe_allow_html=True)
 
-# Auto-refresh timer
-st.markdown("<script>setTimeout(()=>window.location.reload(), 5000)</script>", unsafe_allow_html=True)
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE: SHOOTING
+# ═══════════════════════════════════════════════════════════════════════════════
+else:
+    col_cam, col_preview = st.columns([3, 2], gap="medium")
+
+    with col_cam:
+        st.markdown('<div class="cam-panel">', unsafe_allow_html=True)
+        st.markdown(f'<div class="cam-header">📸 Foto {active+1} dari {N}</div>', unsafe_allow_html=True)
+
+        # Mirror CSS
+        if mirror:
+            st.markdown("""
+            <style>
+            div[data-testid="stCameraInput"] video,
+            div[data-testid="stCameraInput"] img { transform: scaleX(-1) !important; }
+            </style>
+            """, unsafe_allow_html=True)
+
+        # Camera input
+        cam_img = st.camera_input(
+            f"Foto {active+1}",
+            key=f"cam_{active}_{frame_choice}",
+            label_visibility="collapsed",
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # Countdown & action
+        if cam_img is not None:
+            raw = Image.open(cam_img).convert("RGB")
+            if mirror:
+                raw = mirror_image(raw)
+
+            if not st.session_state.countdown_active:
+                # Tampilkan preview + tombol
+                st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                btn_c1, btn_c2 = st.columns(2, gap="small")
+                with btn_c1:
+                    st.markdown('<div class="btn-retake">', unsafe_allow_html=True)
+                    if st.button("🔄 Retake", key="retake_btn", use_container_width=True):
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+                with btn_c2:
+                    st.markdown('<div class="btn-next">', unsafe_allow_html=True)
+                    if st.button("✓ Simpan & Lanjut", key="save_btn", use_container_width=True):
+                        photos[active] = raw
+                        st.session_state.photos = photos
+                        next_empty = next((j for j in range(N) if photos[j] is None), None)
+                        if next_empty is not None:
+                            st.session_state.active_slot = next_empty
+                        else:
+                            st.session_state.phase = "review"
+                        st.rerun()
+                    st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # Countdown otomatis 5 detik
+            if not st.session_state.countdown_active:
+                _, cd_col, _ = st.columns([1, 2, 1])
+                with cd_col:
+                    if st.button("📸  Mulai Countdown 5 Detik", use_container_width=True):
+                        st.session_state.countdown_active = True
+                        st.session_state.countdown_start = time.time()
+                        st.rerun()
+            else:
+                elapsed_cd = time.time() - (st.session_state.countdown_start or time.time())
+                remaining_cd = max(0, 5 - elapsed_cd)
+                count_num = math.ceil(remaining_cd) if remaining_cd > 0 else 0
+
+                if count_num > 0:
+                    st.markdown(f'<div class="countdown-num">{count_num}</div>', unsafe_allow_html=True)
+                    st.markdown('<p style="text-align:center; font-size:0.85rem; color:#9a9aaa; font-weight:700;">Bersiap...</p>', unsafe_allow_html=True)
+                    time.sleep(0.5)
+                    st.rerun()
+                else:
+                    st.session_state.countdown_active = False
+                    st.session_state.countdown_start = None
+                    st.markdown('<p style="text-align:center; font-size:1rem; color:#ff4d8d; font-weight:800;">📸 Foto sekarang!</p>', unsafe_allow_html=True)
+                    st.rerun()
+
+    with col_preview:
+        st.markdown('<div class="preview-panel">', unsafe_allow_html=True)
+        st.markdown('<div class="preview-header">✦ Preview Strip</div>', unsafe_allow_html=True)
+
+        # Build strip dengan foto yang sudah ada
+        strip_preview = build_strip(photos, frame_choice, "Natural")
+        st.image(strip_preview, use_container_width=True)
+
+        # Info
+        st.markdown(f"""
+        <div style="background:#fafafa; border-radius:12px; padding:0.8rem; margin-top:0.8rem;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+                <span style="font-size:0.7rem; color:#9a9aaa; font-weight:700;">FRAME</span>
+                <span style="font-size:0.75rem; font-weight:800; color:#2a2a3a;">{frame_choice}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; margin-bottom:0.4rem;">
+                <span style="font-size:0.7rem; color:#9a9aaa; font-weight:700;">MODE</span>
+                <span style="font-size:0.75rem; font-weight:800; color:#ff4d8d;">{"🪞 Mirror" if mirror else "📷 Normal"}</span>
+            </div>
+            <div style="display:flex; justify-content:space-between;">
+                <span style="font-size:0.7rem; color:#9a9aaa; font-weight:700;">PROGRESS</span>
+                <span style="font-size:0.75rem; font-weight:800; color:#ff4d8d;">{filled}/{N}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+import math

@@ -1,144 +1,231 @@
-"""app.py — Landing page PhotoBooth"""
+"""app.py — Landing page Fotosphere"""
 
 import streamlit as st
 import uuid
+import base64
+import os
 from payment import create_payment, generate_order_id
 from db import create_session
 from style import GLOBAL_CSS
 
-st.set_page_config(page_title="PhotoBooth 📸", page_icon="📸", layout="centered", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Fotosphere", page_icon="assets/icon.png",
+                   layout="wide", initial_sidebar_state="collapsed")
 st.markdown(GLOBAL_CSS, unsafe_allow_html=True)
 st.markdown("""
 <style>
-.hero-card {
-    background: linear-gradient(135deg, #fff0f6, #f3eaff);
-    border: 1.5px solid #f8bbd0;
-    border-radius: 24px;
-    padding: 2.5rem 2rem;
-    text-align: center;
-    box-shadow: 0 8px 40px rgba(240,98,146,0.15);
-    margin-bottom: 1rem;
+html, body {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+    height: 100% !important;
+    margin: 0 !important;
 }
-.hero-title {
-    font-size: 3.5rem !important;
+.stApp {
+    background: linear-gradient(145deg, #f0f0f5 0%, #fafafa 50%, #f5f0f8 100%) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100vh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+}
+.stApp > .main {
+    display: flex !important;
+    flex-direction: column !important;
+    flex: 1 !important;
+    justify-content: center !important;
+    overflow: hidden !important;
+}
+section[data-testid="stAppViewContainer"] { overflow: hidden !important; }
+.block-container {
+    padding: 0 !important;
+    max-width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    min-height: 100vh !important;
+    flex: 1 !important;
+    overflow: hidden !important;
+}
+.block-container > div {
+    width: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 1 !important;
+}
+.stButton > button {
+    background: linear-gradient(135deg, #ff4d8d, #e0005a) !important;
+    font-size: 1.5rem !important;
     font-weight: 900 !important;
-    color: #e91e8c !important;
-    letter-spacing: 2px;
-    margin: 0.5rem 0 0.3rem !important;
-    line-height: 1.1 !important;
+    letter-spacing: 3px !important;
+    padding: 1.2rem 3rem !important;
+    border-radius: 60px !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    cursor: pointer !important;
 }
-.hero-sub { font-size: 1rem; color: #a68ab0; margin: 0; }
+.stButton > button:hover { opacity: 0.9 !important; box-shadow: none !important; transform: none !important; }
+.stButton > button p, .stButton > button span, .stButton > button div {
+    color: white !important; background: transparent !important;
+    border: none !important; padding: 0 !important; margin: 0 !important;
+}
 
-.feat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 1rem 0; }
-.feat-item {
-    background: white;
-    border: 1.5px solid #ebd5f0;
-    border-radius: 14px;
-    padding: 1rem;
+/* Loading hint */
+.loading-hint {
+    margin-top: 1rem;
     text-align: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: #c0a0b0;
+    animation: fadeInUp 0.3s ease both;
 }
-.feat-icon { font-size: 1.5rem; display: block; margin-bottom: 5px; }
-.feat-text { font-size: 0.78rem; font-weight: 700; color: #7b5ea7; }
-.feat-sub { font-size: 0.65rem; color: #a68ab0; margin-top: 2px; }
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+}
+.loading-hint::after {
+    content: '';
+    animation: dots 1.2s steps(4, end) infinite;
+}
 
-.steps-row { display:flex; gap:0; margin: 1rem 0; }
-.step-item { flex:1; text-align:center; position:relative; }
-.step-item::after { content:'›'; position:absolute; right:0; top:50%; transform:translateY(-50%); color:#ebd5f0; font-size:1.2rem; }
-.step-item:last-child::after { display:none; }
-.step-circle {
-    width:36px; height:36px; border-radius:50%;
-    background: linear-gradient(135deg,#f06292,#e91e8c);
-    display:flex; align-items:center; justify-content:center;
-    margin:0 auto 5px; font-size:1rem;
-    box-shadow: 0 4px 10px rgba(240,98,146,0.3);
+/* Loading overlay */
+#loading-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
 }
-.step-lbl { font-size:0.6rem; font-weight:800; color:#a68ab0; letter-spacing:1px; }
+#loading-overlay.show { display: flex; }
+.loading-eye { width: 80px; height: 80px; animation: pulse 1.2s ease-in-out infinite; }
+.loading-text { font-size: 0.85rem; font-weight: 900; letter-spacing: 4px; color: #2a2a3a; animation: fade 1.2s ease-in-out infinite; }
+.loading-dots::after { content: ''; animation: dots 1.5s steps(4, end) infinite; }
+@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }
+@keyframes fade { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 </style>
 """, unsafe_allow_html=True)
 
-if "session_id" not in st.session_state:
-    st.session_state.session_id = None
-if "order_id" not in st.session_state:
-    st.session_state.order_id = None
-if "payment_url" not in st.session_state:
-    st.session_state.payment_url = None
+for k in ["session_id","order_id","payment_url","photos","final_photos",
+          "frame_choice","mirror","selected_filter","strip_ready",
+          "strip_url","strip_bytes_fallback","start_time","active_slot",
+          "n_photos","countdown_active","current_shot","shot_photos","loading"]:
+    if k not in st.session_state:
+        st.session_state[k] = None
 
-# Hero
-st.markdown("""
-<div class="hero-card">
-    <div style="font-size:3rem;">📸</div>
-    <h1 class="hero-title">PhotoBooth</h1>
-    <p class="hero-sub">Foto cantik, filter keren, langsung download!</p>
-    <div style="display:inline-block; background:white; border:2px solid #f8bbd0; border-radius:50px; padding:0.5rem 1.5rem; margin:1rem 0 0.5rem;">
-        <div style="font-size:1.8rem; font-weight:900; color:#f06292;">Rp 10.000</div>
-        <div style="font-size:0.75rem; color:#a68ab0; margin-top:2px;">4 foto · 5 menit · download gratis</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ── TAHAP 2: proses payment setelah loading text sudah kerender ────────────────
+if st.session_state.loading == "processing":
+    try:
+        session_id = str(uuid.uuid4())
+        order_id = generate_order_id()
+        payment = create_payment(order_id, amount=10000)
+        create_session(session_id, order_id)
+        st.session_state.session_id = session_id
+        st.session_state.order_id = order_id
+        st.session_state.payment_url = payment["redirect_url"]
+        st.session_state.loading = None
+        st.switch_page("pages/1_payment.py")
+    except Exception as e:
+        st.session_state.loading = None
+        st.error(f"Error: {e}")
 
-# Features
-st.markdown("""
-<div class="feat-grid">
-    <div class="feat-item">
-        <span class="feat-icon">🌸</span>
-        <div class="feat-text">6 Frame Lucu</div>
-        <div class="feat-sub">berbagai tema pilihan</div>
-    </div>
-    <div class="feat-item">
-        <span class="feat-icon">✨</span>
-        <div class="feat-text">8 Filter Foto</div>
-        <div class="feat-sub">vintage, vivid & more</div>
-    </div>
-    <div class="feat-item">
-        <span class="feat-icon">🔄</span>
-        <div class="feat-text">Retake Bebas</div>
-        <div class="feat-sub">sampai puas dalam 5 menit</div>
-    </div>
-    <div class="feat-item">
-        <span class="feat-icon">📱</span>
-        <div class="feat-text">QR Download</div>
-        <div class="feat-sub">simpan langsung ke HP</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+# ── Helper ─────────────────────────────────────────────────────────────────────
+def img_to_b64(filename):
+    path = os.path.join("assets", filename)
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        ext = filename.split(".")[-1].lower()
+        mime = "image/png" if ext == "png" else f"image/{ext}"
+        return f"data:{mime};base64,{base64.b64encode(f.read()).decode()}"
 
-# Steps
-st.markdown("""
-<div class="steps-row">
-    <div class="step-item"><div class="step-circle">💳</div><div class="step-lbl">BAYAR</div></div>
-    <div class="step-item"><div class="step-circle">🎨</div><div class="step-lbl">FRAME</div></div>
-    <div class="step-item"><div class="step-circle">📸</div><div class="step-lbl">FOTO</div></div>
-    <div class="step-item"><div class="step-circle">✨</div><div class="step-lbl">FILTER</div></div>
-    <div class="step-item"><div class="step-circle">⬇️</div><div class="step-lbl">DOWNLOAD</div></div>
-</div>
-""", unsafe_allow_html=True)
+# ── Layout ─────────────────────────────────────────────────────────────────────
+_, center, _ = st.columns([1, 2, 1])
+with center:
+    icon_b64 = img_to_b64("icon.png")
+    icon_html = f"<img src='{icon_b64}' style='width:100%;height:100%;object-fit:cover;'/>" if icon_b64 else "📷"
+    st.markdown(
+        "<div style='width:100%;display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:2rem;'>"
+        "<div style='width:90px;height:90px;margin-bottom:1rem;overflow:hidden;'>"
+        f"{icon_html}"
+        "</div>"
+        "<div style='font-size:2.2rem;font-weight:900;color:#2a2a3a;letter-spacing:2px;margin:0;'>FOTOSPHERE</div>"
+        "<div style='font-size:0.85rem;color:#9a9aaa;margin:0.3rem 0 0;letter-spacing:2px;'>✦ Self Photo Studio ✦</div>"
+        "</div>",
+        unsafe_allow_html=True
+    )
 
-st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+_, btn_col, _ = st.columns([2, 3, 2])
+with btn_col:
+    icon_b64_loading = img_to_b64("icon.png")
+    st.markdown(
+        f"""
+        <div id="loading-overlay">
+            <img src="{icon_b64_loading}" class="loading-eye" style="border-radius:20px;"/>
+            <div class="loading-text">LOADING<span class="loading-dots"></span></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-_, col, _ = st.columns([1, 4, 1])
-with col:
-    st.markdown("""
-    <style>
-    /* Override button max width on landing only */
-    div[data-testid="stButton"] button {
-        max-width: 380px !important;
-        margin: 0 auto !important;
-        display: block !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    if st.button("✨  Mulai Sesi Sekarang  ✨", use_container_width=True):
-        with st.spinner("Mempersiapkan sesi..."):
-            try:
-                session_id = str(uuid.uuid4())
-                order_id = generate_order_id()
-                payment = create_payment(order_id, amount=10000)
-                create_session(session_id, order_id)
-                st.session_state.session_id = session_id
-                st.session_state.order_id = order_id
-                st.session_state.payment_url = payment["redirect_url"]
-                st.switch_page("pages/1_payment.py")
-            except Exception as e:
-                st.error(f"Gagal membuat sesi: {e}")
+    # Sembunyiin button saat loading, tampilkan saat idle
+    if not st.session_state.loading:
+        if st.button("TAP TO START", use_container_width=True):
+            # TAHAP 1: set loading → rerun → render teks dulu
+            st.session_state.loading = "show"
+            st.rerun()
 
-st.markdown("<p style='text-align:center; color:#c9a8d4; font-size:0.72rem; margin-top:0.8rem;'>🔒 Pembayaran aman via Midtrans</p>", unsafe_allow_html=True)
+    # TAHAP 1 render: teks loading muncul, lalu langsung rerun ke tahap 2
+    if st.session_state.loading == "show":
+        st.markdown(
+            "<div class='loading-hint'>MEMPERSIAPKAN SESI</div>",
+            unsafe_allow_html=True
+        )
+        st.session_state.loading = "processing"
+        st.rerun()
+
+    # TAHAP 2 render: teks tetap ada saat proses berlangsung
+    if st.session_state.loading == "processing":
+        st.markdown(
+            "<div class='loading-hint'>MEMPERSIAPKAN SESI</div>",
+            unsafe_allow_html=True
+        )
+
+_, center2, _ = st.columns([2, 3, 2])
+with center2:
+    logos = [
+        ("gopay.png","GoPay"),("dana.png","DANA"),("ovo.png","OVO"),
+        ("linkaja.png","LinkAja"),("shopeepay.png","ShopeePay"),
+        ("bca.png","BCA"),("mandiri.png","Mandiri"),("bri.png","BRI"),
+        ("bni.png","BNI"),("qris.png","QRIS"),
+    ]
+    imgs_html = ""
+    for fname, label in logos:
+        b64 = img_to_b64(fname)
+        if b64:
+            imgs_html += f'<img src="{b64}" height="24" style="object-fit:contain;max-height:24px;">'
+        else:
+            imgs_html += f'<span style="font-size:0.65rem;font-weight:800;color:#666;">{label}</span>'
+
+    st.markdown(
+        "<p style='text-align:center;color:#c0c0cc;font-size:0.72rem;margin-top:0.8rem;letter-spacing:1px;'>Your Epic Shots are on the Way!</p>"
+        "<div style='height:2rem;'></div>"
+        "<div style='background:white;border-radius:20px;padding:0.8rem 1rem;box-shadow:0 4px 20px rgba(0,0,0,0.06);border:1.5px solid #f0f0f0;'>"
+        "<p style='text-align:center;font-size:0.6rem;font-weight:700;color:#9a9aaa;letter-spacing:3px;margin:0 0 0.8rem;'>METODE PEMBAYARAN</p>"
+        f"<div style='display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:center;'>{imgs_html}</div>"
+        "</div>",
+        unsafe_allow_html=True
+    )
