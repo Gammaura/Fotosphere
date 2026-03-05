@@ -6,6 +6,7 @@ from PIL import Image
 from utils import mirror_image, pil_to_bytes, FRAMES, build_strip, apply_filter
 from db import upload_photo, update_session
 from style import GLOBAL_CSS, step_bar
+import math
 
 st.set_page_config(page_title="Gamma PhotoBooth · Foto", page_icon="📸",
                    layout="wide", initial_sidebar_state="collapsed")
@@ -331,5 +332,3 @@ else:
         </div>
         """, unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
-
-import math
