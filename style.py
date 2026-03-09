@@ -27,8 +27,19 @@ GLOBAL_CSS = """
     min-height: 100vh;
 }
 
-#MainMenu, footer, header, .stDeployButton,
-section[data-testid="stSidebar"] { display: none !important; }
+/* Sembunyiin semua elemen Streamlit yang tidak perlu */
+#MainMenu,
+footer,
+header,
+header[data-testid="stHeader"],
+.stDeployButton,
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"],
+section[data-testid="stSidebarNav"] {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+}
 
 .block-container {
     padding: 1.5rem 2rem !important;

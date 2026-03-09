@@ -71,51 +71,44 @@ section[data-testid="stAppViewContainer"] { overflow: hidden !important; }
     border: none !important; padding: 0 !important; margin: 0 !important;
 }
 
-/* Loading hint */
-.loading-hint {
-    margin-top: 1rem;
-    text-align: center;
-    font-size: 0.75rem;
-    font-weight: 700;
-    letter-spacing: 3px;
-    color: #c0a0b0;
-    animation: fadeInUp 0.3s ease both;
-}
-@keyframes fadeInUp {
-    from { opacity: 0; transform: translateY(6px); }
-    to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes dots {
-    0%   { content: ''; }
-    25%  { content: '.'; }
-    50%  { content: '..'; }
-    75%  { content: '...'; }
-}
-.loading-hint::after {
-    content: '';
-    animation: dots 1.2s steps(4, end) infinite;
-}
-
 /* Loading overlay */
 #loading-overlay {
     display: none;
     position: fixed;
     top: 0; left: 0;
     width: 100vw; height: 100vh;
-    background: rgba(255,255,255,0.85);
-    backdrop-filter: blur(8px);
+    background: rgba(255,255,255,0.88);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     z-index: 9999;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 1.5rem;
+    gap: 1.6rem;
 }
-#loading-overlay.show { display: flex; }
-.loading-eye { width: 80px; height: 80px; animation: pulse 1.2s ease-in-out infinite; }
-.loading-text { font-size: 0.85rem; font-weight: 900; letter-spacing: 4px; color: #2a2a3a; animation: fade 1.2s ease-in-out infinite; }
-.loading-dots::after { content: ''; animation: dots 1.5s steps(4, end) infinite; }
-@keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }
-@keyframes fade { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+#loading-overlay.show { display: flex !important; }
+
+.loading-logo {
+    width: 90px;
+    height: 90px;
+    border-radius: 20px;
+    overflow: hidden;
+    animation: pulse 1.1s ease-in-out infinite;
+}
+.loading-logo img { width: 100%; height: 100%; object-fit: cover; }
+
+.loading-text {
+    font-size: 0.82rem;
+    font-weight: 900;
+    letter-spacing: 5px;
+    color: #2a2a3a;
+    font-family: 'Nunito', sans-serif;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.15); opacity: 0.75; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -126,7 +119,7 @@ for k in ["session_id","order_id","payment_url","photos","final_photos",
     if k not in st.session_state:
         st.session_state[k] = None
 
-# ── TAHAP 2: proses payment setelah loading text sudah kerender ────────────────
+# ── TAHAP 2: proses payment setelah loading sudah kerender ────────────────────
 if st.session_state.loading == "processing":
     try:
         session_id = str(uuid.uuid4())
@@ -142,7 +135,7 @@ if st.session_state.loading == "processing":
         st.session_state.loading = None
         st.error(f"Error: {e}")
 
-# ── Helper ─────────────────────────────────────────────────────────────────────
+# ── Helper ────────────────────────────────────────────────────────────────────
 def img_to_b64(filename):
     path = os.path.join("assets", filename)
     if not os.path.exists(path):
@@ -152,14 +145,69 @@ def img_to_b64(filename):
         mime = "image/png" if ext == "png" else f"image/{ext}"
         return f"data:{mime};base64,{base64.b64encode(f.read()).decode()}"
 
-# ── Layout ─────────────────────────────────────────────────────────────────────
+icon_b64 = img_to_b64("icon.png")
+icon_src = f"data:image/png;base64,{icon_b64.split(',')[1]}" if icon_b64 else ""
+
+# ── Overlay loading (selalu ada di DOM, disembunyiin via CSS) ─────────────────
+st.markdown(
+    f"""
+    <div id="loading-overlay">
+        <div class="loading-logo">
+            <img src="{icon_src}" alt="logo"/>
+        </div>
+        <div class="loading-text" id="loading-label">MEMPERSIAPKAN SESI</div>
+    </div>
+    <script>
+        (function() {{
+            // Animasi dots pada label
+            function startDots() {{
+                var el = document.getElementById('loading-label');
+                if (!el) {{ setTimeout(startDots, 100); return; }}
+                var base = 'MEMPERSIAPKAN SESI';
+                var d = 0;
+                setInterval(function() {{
+                    d = (d + 1) % 4;
+                    el.textContent = base + '.'.repeat(d);
+                }}, 400);
+            }}
+
+            // Intercept klik tombol TAP TO START → tampilkan overlay dulu
+            function hookButton() {{
+                var btns = window.parent.document.querySelectorAll('button');
+                btns.forEach(function(btn) {{
+                    if (btn.innerText && btn.innerText.trim().includes('TAP TO START')) {{
+                        btn.addEventListener('click', function() {{
+                            var overlay = window.parent.document.getElementById('loading-overlay');
+                            if (!overlay) overlay = document.getElementById('loading-overlay');
+                            if (overlay) overlay.classList.add('show');
+                        }}, {{ once: true }});
+                    }}
+                }});
+            }}
+
+            // Tunggu DOM siap
+            if (document.readyState === 'loading') {{
+                document.addEventListener('DOMContentLoaded', function() {{
+                    startDots();
+                    setTimeout(hookButton, 500);
+                }});
+            }} else {{
+                startDots();
+                setTimeout(hookButton, 500);
+            }}
+        }})();
+    </script>
+    """,
+    unsafe_allow_html=True
+)
+
+# ── Layout ────────────────────────────────────────────────────────────────────
 _, center, _ = st.columns([1, 2, 1])
 with center:
-    icon_b64 = img_to_b64("icon.png")
     icon_html = f"<img src='{icon_b64}' style='width:100%;height:100%;object-fit:cover;'/>" if icon_b64 else "📷"
     st.markdown(
         "<div style='width:100%;display:flex;flex-direction:column;align-items:center;text-align:center;margin-bottom:2rem;'>"
-        "<div style='width:90px;height:90px;margin-bottom:1rem;overflow:hidden;'>"
+        "<div style='width:90px;height:90px;margin-bottom:1rem;overflow:hidden;border-radius:18px;'>"
         f"{icon_html}"
         "</div>"
         "<div style='font-size:2.2rem;font-weight:900;color:#2a2a3a;letter-spacing:2px;margin:0;'>FOTOSPHERE</div>"
@@ -170,39 +218,13 @@ with center:
 
 _, btn_col, _ = st.columns([2, 3, 2])
 with btn_col:
-    icon_b64_loading = img_to_b64("icon.png")
-    st.markdown(
-        f"""
-        <div id="loading-overlay">
-            <img src="{icon_b64_loading}" class="loading-eye" style="border-radius:20px;"/>
-            <div class="loading-text">LOADING<span class="loading-dots"></span></div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # Sembunyiin button saat loading, tampilkan saat idle
-    if not st.session_state.loading:
-        if st.button("TAP TO START", use_container_width=True):
-            # TAHAP 1: set loading → rerun → render teks dulu
-            st.session_state.loading = "show"
-            st.rerun()
-
-    # TAHAP 1 render: teks loading muncul, lalu langsung rerun ke tahap 2
-    if st.session_state.loading == "show":
-        st.markdown(
-            "<div class='loading-hint'>MEMPERSIAPKAN SESI</div>",
-            unsafe_allow_html=True
-        )
-        st.session_state.loading = "processing"
+    if st.button("TAP TO START", use_container_width=True):
+        st.session_state.loading = "show"
         st.rerun()
 
-    # TAHAP 2 render: teks tetap ada saat proses berlangsung
-    if st.session_state.loading == "processing":
-        st.markdown(
-            "<div class='loading-hint'>MEMPERSIAPKAN SESI</div>",
-            unsafe_allow_html=True
-        )
+    if st.session_state.loading == "show":
+        st.session_state.loading = "processing"
+        st.rerun()
 
 _, center2, _ = st.columns([2, 3, 2])
 with center2:
