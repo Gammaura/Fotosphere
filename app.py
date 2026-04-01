@@ -8,6 +8,14 @@ from payment import create_payment, generate_order_id
 from db import create_session
 from style import GLOBAL_CSS
 
+
+st.markdown("""
+<style>
+[data-testid="stSidebar"] { display: none !important; }
+[data-testid="collapsedControl"] { display: none !important; }
+</style>
+""", unsafe_allow_html=True)
+
 st.set_page_config(page_title="Fotosphere", page_icon="assets/icon.png",
                    layout="wide", initial_sidebar_state="collapsed")
 st.markdown(GLOBAL_CSS, unsafe_allow_html=True)

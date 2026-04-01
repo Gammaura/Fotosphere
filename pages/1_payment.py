@@ -14,7 +14,13 @@ from style import GLOBAL_CSS, step_bar
 st.set_page_config(page_title="Fotosphere · Bayar", page_icon="💳",
                    layout="wide", initial_sidebar_state="collapsed")
 
+# ── Handle query params (back / restart / goto home) ──────────────────────────
 if st.query_params.get("action") in ("back", "restart"):
+    st.query_params.clear()
+    st.session_state.payment_start = None
+    st.switch_page("app.py")
+
+if st.query_params.get("goto") == "home":
     st.query_params.clear()
     st.session_state.payment_start = None
     st.switch_page("app.py")
@@ -33,33 +39,14 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
 
-html, body {
+html, body, .stApp {
     overflow: hidden !important;
-    overscroll-behavior: none !important;
     height: 100% !important;
     margin: 0 !important;
 }
-.stApp {
-    height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-    overscroll-behavior: none !important;
-}
-.stApp > .main {
-    flex: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-}
-section[data-testid="stAppViewContainer"] {
-    height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    overflow: hidden !important;
-}
+section[data-testid="stAppViewContainer"],
 section[data-testid="stAppViewContainer"] > div {
-    flex: 1 !important;
+    height: 100vh !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
@@ -72,7 +59,6 @@ section[data-testid="stAppViewContainer"] > div {
     justify-content: center !important;
     padding: 0 !important;
     max-width: 100% !important;
-    min-height: 100vh !important;
     overflow: hidden !important;
 }
 .block-container > div {
@@ -84,44 +70,42 @@ section[data-testid="stAppViewContainer"] > div {
     flex: 1 !important;
 }
 #MainMenu, footer, header { visibility: hidden; }
-div[data-testid="stSpinner"] { display: none !important; }
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"],
+div[data-testid="stSpinner"],
 .stButton > button { display: none !important; }
 
+/* ── Layout utama ── */
 .pay-outer {
     width: 100%;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 1rem 2rem;
+    padding: 1.5rem 2rem;
     box-sizing: border-box;
 }
 .pay-card {
     background: #2a2a32;
-    border-radius: 28px;
-    padding: 1.5rem 2rem;
+    border-radius: 24px;
+    padding: 1.2rem 1.8rem 1.5rem;
     width: 100%;
-    max-width: 760px;
-    margin: 0 auto;
+    max-width: 700px;
     box-shadow: 0 40px 80px rgba(0,0,0,0.5);
-    
     position: relative;
+    box-sizing: border-box;
 }
-@keyframes slideUp {
-    from { opacity:0; transform:translateY(24px); }
-    to   { opacity:1; transform:translateY(0); }
-}
+
+/* ── Header ── */
 .card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
     margin-bottom: 1rem;
 }
-.header-left { flex: 1; display: flex; align-items: center; }
-.header-right { flex: 1; display: flex; align-items: center; justify-content: flex-end; }
 .header-title {
     font-family: 'Space Mono', monospace;
-    font-size: 0.75rem;
+    font-size: 0.65rem;
     font-weight: 700;
     color: #888899;
     letter-spacing: 5px;
@@ -129,17 +113,21 @@ div[data-testid="stSpinner"] { display: none !important; }
 .timer-wrap {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     font-family: 'Space Mono', monospace;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 700;
     letter-spacing: 2px;
 }
+
+/* ── Body ── */
 .card-body {
     display: flex;
-    gap: 2rem;
+    gap: 1.2rem;
     align-items: flex-start;
 }
+
+/* ── Kiri: QR ── */
 .col-qr {
     flex: 1;
     display: flex;
@@ -148,64 +136,78 @@ div[data-testid="stSpinner"] { display: none !important; }
 }
 .qr-frame {
     width: 100%;
-    aspect-ratio: 1/1;
-    border-radius: 16px;
-    margin-bottom: 0.8rem;
+    aspect-ratio: 1 / 1;
+    border-radius: 14px;
+    background-color: white;
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    background-color: white;
-    padding: 0.8rem;
+    padding: 0.5rem;
     box-sizing: border-box;
+    margin-bottom: 0.6rem;
 }
 .amount-label {
     font-family: 'Space Mono', monospace;
-    font-size: 1.4rem;
+    font-size: 1.1rem;
     font-weight: 700;
     color: #ffffff;
     text-align: center;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.2rem;
 }
 .order-chip {
     font-family: 'Space Mono', monospace;
-    font-size: 0.58rem;
+    font-size: 0.48rem;
     color: #555566;
     letter-spacing: 1px;
     background: #1e1e25;
-    padding: 3px 10px;
+    padding: 2px 10px;
     border-radius: 20px;
     text-align: center;
 }
+
+/* ── Kanan: mascot + steps ── */
 .col-info {
     flex: 1;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
-    align-self: flex-start;
-    margin-top: 2.5rem;
+    align-items: stretch;
+}
+.mascot-wrap {
+    width: 100%;
+    height: 120px;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center bottom;
+    margin-bottom: 0;
+    position: relative;
+    z-index: 1;
 }
 .steps-box {
     background: #1e1e25;
     border: 1px solid #3a3a45;
     border-radius: 16px;
-    padding: 1.2rem 1rem;
+    padding: 1rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    position: relative;
+    z-index: 1;
 }
 .step-item {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     font-family: 'Space Mono', monospace;
-    font-size: 0.68rem;
+    font-size: 0.6rem;
     color: #888899;
-    margin-bottom: 0.6rem;
 }
-.step-item:last-child { margin-bottom: 0; }
 .step-dot {
-    width: 22px; height: 22px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
     background: linear-gradient(135deg, #ff4d8d, #e0005a);
     color: white;
-    font-size: 0.62rem;
+    font-size: 0.55rem;
     font-weight: 700;
     display: inline-flex;
     align-items: center;
@@ -213,62 +215,12 @@ div[data-testid="stSpinner"] { display: none !important; }
     flex-shrink: 0;
 }
 
-/* ── Status box animasi ── */
-.status-box {
-    border-radius: 12px;
-    padding: 0.65rem 1rem;
-    text-align: center;
-    font-family: 'Space Mono', monospace;
-    font-size: 0.65rem;
-    font-weight: 700;
-    letter-spacing: 1px;
-    position: relative;
-    overflow: hidden;
-}
-.status-expire { background:#1a1a20; border:1px solid #3a3a45; color:#555566; }
-.status-ok     { background:#0e1e12; border:1px solid #1a4025; color:#4caf50; }
-
-/* Waiting — animasi shimmer + pulse border */
-.status-wait {
-    background: #1e1a10;
-    border: 1px solid #fb8c00;
-    color: #fb8c00;
-    
-}
-
-/* Shimmer sweep */
-.status-wait::before {
-    content: '';
-    position: absolute;
-    top: 0; left: -100%;
-    width: 60%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(251,140,0,0.12), transparent);
-    animation: shimmer 2s ease-in-out infinite;
-}
-@keyframes shimmer {
-    0%   { left: -60%; }
-    100% { left: 160%; }
-}
-
-/* Titik animasi di dalam teks */
-.wait-dots::after {
-    content: '';
-    animation: dots 1.4s steps(4, end) infinite;
-}
-@keyframes dots {
-    0%   { content: ''; }
-    25%  { content: '.'; }
-    50%  { content: '..'; }
-    75%  { content: '...'; }
-}
-
 /* ── Expired overlay ── */
 .expired-overlay {
     position: absolute;
     inset: 0;
     background: rgba(13,13,15,0.85);
-    border-radius: 28px;
+    border-radius: 24px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -295,19 +247,68 @@ div[data-testid="stSpinner"] { display: none !important; }
     color: #888899;
     border: 1px solid #3a3a45;
     cursor: pointer;
-    transition: all 0.2s;
     text-decoration: none;
 }
 .restart-btn:hover { background: #3a3a45; color: #aaaacc; }
+
+/* ── No-session screen ── */
+.nosession-outer {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.nosession-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.8rem;
+}
+.nosession-btn {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    background: #2a2a32;
+    border: 1.5px solid #3a3a45;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s;
+    text-decoration: none;
+}
+.nosession-btn:hover { background: #3a3a45; }
+.nosession-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.55rem;
+    color: #555566;
+    letter-spacing: 3px;
+}
 </style>
 """, unsafe_allow_html=True)
 
+# ── No session: tampilkan tombol reload di tengah ─────────────────────────────
 if not st.session_state.get("session_id"):
-    st.warning("Sesi tidak ditemukan.")
-    if st.button("← Kembali"):
-        st.switch_page("app.py")
+    st.markdown("""
+    <div class="nosession-outer">
+      <div class="nosession-wrap">
+        <a class="nosession-btn" href="?goto=home" title="Kembali ke halaman awal">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+            <path d="M4 12C4 7.58 7.58 4 12 4C14.76 4 17.2 5.36 18.72 7.46L16 7.46"
+              stroke="#888899" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 12C20 16.42 16.42 20 12 20C9.24 20 6.8 18.64 5.28 16.54L8 16.54"
+              stroke="#888899" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+        <span class="nosession-label">MULAI ULANG</span>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
     st.stop()
 
+# ── Session valid: lanjut render halaman pembayaran ───────────────────────────
 session_id  = st.session_state.session_id
 order_id    = st.session_state.order_id
 payment_url = st.session_state.payment_url
@@ -341,48 +342,38 @@ if not is_expired and payment_url:
     except Exception as e:
         st.error(f"Gagal cek status: {e}")
 
-qr_b64 = base64.b64encode(make_qr(payment_url)).decode() if payment_url else ""
+qr_b64     = base64.b64encode(make_qr(payment_url)).decode() if payment_url else ""
+mascot_b64 = load_asset_b64("karakter.png")
 
-back_svg = """<a href="?action=back" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;opacity:0.7;text-decoration:none;">
-  <svg style="width:38px;height:38px;" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+back_svg = """<a href="?action=back" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;opacity:0.7;text-decoration:none;">
+  <svg width="34" height="34" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="10" stroke="#aaaacc" stroke-width="1.5"/>
     <path d="M13.5 8.5L9.5 12L13.5 15.5" stroke="#aaaacc" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
   </svg>
 </a>"""
 
-restart_url = "?action=restart"
-
-expired_overlay = f"""
+expired_overlay = """
 <div class="expired-overlay">
-  <span class="expired-text">⏱ WAKTU HABIS</span>
-  <a class="restart-btn" href="{restart_url}">MULAI ULANG</a>
+  <span class="expired-text">&#9201; WAKTU HABIS</span>
+  <a class="restart-btn" href="?action=restart">MULAI ULANG</a>
 </div>
 """ if is_expired else ""
-
-if is_expired:
-    status_class = "status-expire"
-    status_inner = "⏱ WAKTU HABIS"
-else:
-    status_class = "status-wait"
-    status_inner = "⏳ MENUNGGU PEMBAYARAN<span class='wait-dots'></span>"
 
 st.markdown(f"""
 <div class="pay-outer">
 <div class="pay-card">
   {expired_overlay}
   <div class="card-header">
-    <div class="header-left">{back_svg}</div>
+    <div>{back_svg}</div>
     <span class="header-title">PEMBAYARAN</span>
-    <div class="header-right">
-      <div class="timer-wrap">
-        <svg width="32" height="32" viewBox="0 0 100 100">
-          <circle cx="50" cy="50" r="45" fill="none" stroke="#3a3a45" stroke-width="9"/>
-          <circle cx="50" cy="50" r="45" fill="none" stroke="{ring_color}" stroke-width="9"
-            stroke-dasharray="283" stroke-dashoffset="{283 - pct}"
-            stroke-linecap="round" transform="rotate(-90 50 50)"/>
-        </svg>
-        <span style="color:{ring_color};font-family:'Space Mono',monospace;">{mins:02d}:{secs:02d}</span>
-      </div>
+    <div class="timer-wrap">
+      <svg width="26" height="26" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="45" fill="none" stroke="#3a3a45" stroke-width="9"/>
+        <circle cx="50" cy="50" r="45" fill="none" stroke="{ring_color}" stroke-width="9"
+          stroke-dasharray="283" stroke-dashoffset="{283 - pct}"
+          stroke-linecap="round" transform="rotate(-90 50 50)"/>
+      </svg>
+      <span style="color:{ring_color}">{mins:02d}:{secs:02d}</span>
     </div>
   </div>
   <div class="card-body">
@@ -392,6 +383,7 @@ st.markdown(f"""
       <div class="order-chip">{order_id}</div>
     </div>
     <div class="col-info">
+      <div class="mascot-wrap" style="background-image:url('data:image/png;base64,{mascot_b64}');"></div>
       <div class="steps-box">
         <div class="step-item"><div class="step-dot">1</div><span>Buka e-wallet atau m-banking</span></div>
         <div class="step-item"><div class="step-dot">2</div><span>Pilih menu Scan / QRIS</span></div>
@@ -399,7 +391,6 @@ st.markdown(f"""
         <div class="step-item"><div class="step-dot">4</div><span>Konfirmasi Rp 10.000</span></div>
         <div class="step-item"><div class="step-dot">5</div><span>Tunggu redirect otomatis</span></div>
       </div>
-      <div class="status-box {status_class}">{status_inner}</div>
     </div>
   </div>
 </div>
